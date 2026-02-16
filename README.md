@@ -7,6 +7,44 @@ An interactive dashboard that works with user-uploaded CSV files. This repo incl
 
 ---
 
+## Vercel Setup (production login + Postgres)
+
+Follow these steps so Google login works on Vercel (avoids “DATABASE_URL missing” after the OAuth callback).
+
+1. **Create a Postgres database**
+   - **Vercel Postgres:** In the [Vercel Dashboard](https://vercel.com/dashboard), go to **Storage** → **Create Database** → **Postgres**. Create the DB; Vercel will add env vars such as `POSTGRES_URL` or `POSTGRES_PRISMA_URL`. The app also reads **DATABASE_URL**, so copy the connection string into an env var named **DATABASE_URL** (or rely on the app’s fallback: it uses `DATABASE_URL` → `POSTGRES_PRISMA_URL` → `POSTGRES_URL`).
+   - **Neon:** At [neon.tech](https://neon.tech), create a project and copy the connection string.
+
+2. **Copy the connection string**  
+   Use the URL from Vercel Postgres or Neon (e.g. `postgresql://user:password@host/db?sslmode=require`).
+
+3. **Set environment variables in Vercel**  
+   In your project: **Settings** → **Environment Variables**. Add these for **Production** (and **Preview** if you use preview deployments):
+
+   | Name | Value |
+   |------|--------|
+   | `DATABASE_URL` | Your Postgres connection string (from step 1–2). |
+   | `NEXTAUTH_URL` | `https://<your-project>.vercel.app` (or your custom domain). |
+   | `NEXTAUTH_SECRET` | A long random string (e.g. `openssl rand -base64 32`). |
+   | `GOOGLE_CLIENT_ID` | From Google Cloud Console → OAuth 2.0 Web client. |
+   | `GOOGLE_CLIENT_SECRET` | From the same OAuth client. |
+
+   The app resolves the DB URL from **DATABASE_URL**, **POSTGRES_PRISMA_URL**, or **POSTGRES_URL**, so if Vercel Postgres only injects one of the latter, the app will use it; setting **DATABASE_URL** explicitly is still recommended.
+
+4. **Redeploy**  
+   Trigger a new deployment (e.g. **Deployments** → **Redeploy**) so the new env vars are applied.
+
+5. **Run migrations**  
+   Apply the schema to your production database. **Safe option (recommended):** from your machine, run:
+   ```bash
+   DATABASE_URL="your-production-connection-string" npx prisma migrate deploy
+   ```
+   Use the same URL you set in Vercel (or the direct/non-pooling URL for Vercel Postgres if recommended). Do **not** run `prisma migrate dev` in production or in the Vercel build.
+
+**Check:** After redeploy, open `https://<your-project>.vercel.app/api/health/db`. It should return `{ "ok": true }` if the database is configured and reachable. Then try signing in with Google.
+
+---
+
 ## Web App (Next.js) — Local Development
 
 ### Prerequisites

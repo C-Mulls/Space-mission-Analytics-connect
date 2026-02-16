@@ -15,6 +15,29 @@ export default async function LoginPage({
   const isCallbackError = error === 'Callback' || error === 'OAuthCallback';
   const isOAuthError = !isCallbackError && (error === 'OAuthSignin' || error === 'OAuthCreateAccount');
 
+  const isProduction =
+    process.env.VERCEL === '1' || (process.env.NEXTAUTH_URL ?? '').startsWith('https://');
+
+  const callbackErrorMessage = isProduction ? (
+    <p className="mt-1 text-red-700 dark:text-red-300">
+      <strong>DATABASE_URL</strong> is not set in Vercel Project Settings. Add a hosted Postgres
+      connection string (Vercel Postgres or Neon) under Settings → Environment Variables, then
+      redeploy. See the README &quot;Vercel Setup&quot; section for exact steps.
+    </p>
+  ) : (
+    <p className="mt-1 text-red-700 dark:text-red-300">
+      Server is missing database configuration. Set <strong>DATABASE_URL</strong> in{' '}
+      <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">.env</code> or{' '}
+      <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">.env.local</code> and restart the
+      dev server. If you don&apos;t have Postgres, run{' '}
+      <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">docker compose up -d</code> then
+      use{' '}
+      <code className="break-all bg-red-100 dark:bg-red-900/40 px-1 rounded text-xs">
+        postgresql://spacemission:spacemission@localhost:5432/spacemission?schema=public
+      </code>
+    </p>
+  );
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-8 text-center">
@@ -30,9 +53,7 @@ export default async function LoginPage({
         {isCallbackError && (
           <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-left text-sm text-red-800 dark:text-red-200">
             <p className="font-medium">Login failed</p>
-            <p className="mt-1 text-red-700 dark:text-red-300">
-              Server is missing database configuration (DATABASE_URL). Set DATABASE_URL in .env.local and restart the dev server. If you don&apos;t have Postgres, run <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">docker compose up -d</code> then use <code className="break-all bg-red-100 dark:bg-red-900/40 px-1 rounded text-xs">postgresql://spacemission:spacemission@localhost:5432/spacemission?schema=public</code>
-            </p>
+            {callbackErrorMessage}
           </div>
         )}
         {(isOAuthError && !isCallbackError) && (
@@ -42,9 +63,8 @@ export default async function LoginPage({
               Check your <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">.env.local</code>: set{' '}
               <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">GOOGLE_CLIENT_ID</code>,{' '}
               <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">GOOGLE_CLIENT_SECRET</code>,{' '}
-              <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">NEXTAUTH_URL=http://localhost:3000</code> and{' '}
-              <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">NEXTAUTH_SECRET</code>. In Google Cloud Console, add redirect URI:{' '}
-              <code className="break-all bg-amber-100 dark:bg-amber-900/40 px-1 rounded text-xs">http://localhost:3000/api/auth/callback/google</code>
+              <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">NEXTAUTH_URL</code> and{' '}
+              <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">NEXTAUTH_SECRET</code>. In Google Cloud Console, add the correct redirect URI for your environment.
             </p>
           </div>
         )}

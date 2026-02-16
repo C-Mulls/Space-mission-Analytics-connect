@@ -10,7 +10,8 @@ const handler = NextAuth(authOptions);
 function authUnavailable() {
   return NextResponse.json(
     {
-      error: 'Auth is temporarily unavailable. Database is not configured (DATABASE_URL missing). Add DATABASE_URL in Vercel project settings and redeploy.',
+      error:
+        'Auth is temporarily unavailable. Set DATABASE_URL (or POSTGRES_PRISMA_URL / POSTGRES_URL) in Vercel Project Settings → Environment Variables, then redeploy.',
     },
     { status: 503 }
   );
