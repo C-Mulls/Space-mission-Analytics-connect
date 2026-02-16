@@ -1,13 +1,11 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import type { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { rowsQuerySchema } from '@/lib/validate';
+import { parseSort, buildRowsWhere } from '@/lib/query';
 
 export const runtime = 'nodejs';
-
-const PAGE_SIZE = 50;
-const MAX_PAGE = 500;
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -16,23 +14,29 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const datasetId = searchParams.get('datasetId');
-  const page = Math.min(
-    Math.max(1, parseInt(searchParams.get('page') ?? '1', 10)),
-    MAX_PAGE
-  );
-  const dateFrom = searchParams.get('dateFrom');
-  const dateTo = searchParams.get('dateTo');
-  const company = searchParams.get('company');
-  const missionStatus = searchParams.get('missionStatus');
-  const search = searchParams.get('search')?.trim().slice(0, 200) ?? '';
+  const parsed = rowsQuerySchema.safeParse({
+    datasetId: searchParams.get('datasetId') ?? undefined,
+    page: searchParams.get('page') ?? undefined,
+    pageSize: searchParams.get('pageSize') ?? undefined,
+    sort: searchParams.get('sort') ?? undefined,
+    search: searchParams.get('search') ?? undefined,
+    company: searchParams.get('company') ?? undefined,
+    missionStatus: searchParams.get('missionStatus') ?? undefined,
+    rocketStatus: searchParams.get('rocketStatus') ?? undefined,
+    location: searchParams.get('location') ?? undefined,
+    dateFrom: searchParams.get('dateFrom') ?? undefined,
+    dateTo: searchParams.get('dateTo') ?? undefined,
+  });
 
-  if (!datasetId) {
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Missing datasetId' },
+      { error: 'Invalid query', details: parsed.error.flatten() },
       { status: 400 }
     );
   }
+
+  const { datasetId, page, pageSize, sort, search, company, missionStatus, rocketStatus, location, dateFrom, dateTo } =
+    parsed.data;
 
   const dataset = await prisma.dataset.findFirst({
     where: { id: datasetId, userId: session.user.id },
@@ -42,28 +46,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Dataset not found' }, { status: 404 });
   }
 
-  const where: Prisma.MissionRowWhereInput = { datasetId };
+  const orderBy = parseSort(Array.isArray(sort) ? sort : []);
+  const where = buildRowsWhere(datasetId, {
+    search: search || undefined,
+    company: company?.length ? company : undefined,
+    missionStatus: missionStatus?.length ? missionStatus : undefined,
+    rocketStatus: rocketStatus?.length ? rocketStatus : undefined,
+    location: location?.length ? location : undefined,
+    dateFrom,
+    dateTo,
+  });
 
-  if (dateFrom || dateTo) {
-    where.date = {};
-    if (dateFrom) where.date.gte = new Date(dateFrom);
-    if (dateTo) {
-      const d = new Date(dateTo);
-      d.setHours(23, 59, 59, 999);
-      where.date.lte = d;
-    }
-  }
-  if (company && company.trim()) where.company = { equals: company.trim(), mode: 'insensitive' as const };
-  if (missionStatus && missionStatus.trim())
-    where.missionStatus = { equals: missionStatus.trim(), mode: 'insensitive' as const };
-  if (search) where.mission = { contains: search, mode: 'insensitive' as const };
-
-  const [rows, total] = await Promise.all([
+  const [rows, totalRows] = await Promise.all([
     prisma.missionRow.findMany({
       where,
-      orderBy: [{ date: 'asc' }, { mission: 'asc' }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         company: true,
@@ -93,9 +92,8 @@ export async function GET(request: Request) {
       price: r.price != null ? Number(r.price) : null,
       missionStatus: r.missionStatus,
     })),
-    total,
+    totalRows,
     page,
-    pageSize: PAGE_SIZE,
-    totalPages: Math.ceil(total / PAGE_SIZE),
+    pageSize,
   });
 }

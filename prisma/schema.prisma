@@ -18,9 +18,10 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  datasets      Dataset[]
+  accounts           Account[]
+  sessions           Session[]
+  datasets           Dataset[]
+  tablePreferences   TablePreference[]
 }
 
 model Account {
@@ -75,6 +76,7 @@ model Dataset {
   aggregateYear     AggregateYear[]
   aggregateStatus   AggregateStatus[]
   aggregateRocket   AggregateRocket[]
+  tablePreferences  TablePreference[]
 
   @@index([userId, uploadedAt])
 }
@@ -140,5 +142,22 @@ model AggregateRocket {
 
   dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
 
+  @@index([datasetId])
+}
+
+model TablePreference {
+  id               String   @id @default(cuid())
+  userId           String
+  datasetId        String
+  columnOrder      Json     @default("[]")
+  columnSizing     Json     @default("{}")
+  columnVisibility Json     @default("{}")
+  updatedAt        DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, datasetId])
+  @@index([userId])
   @@index([datasetId])
 }

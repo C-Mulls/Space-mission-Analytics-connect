@@ -1,12 +1,12 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import Link from 'next/link';
 import { DatasetList } from './DatasetList';
 import { UploadDialog } from './UploadDialog';
 import { SummaryCards } from './SummaryCards';
 import { Charts } from './Charts';
-import { DataTable } from './DataTable';
+import { MissionsGrid } from './MissionsGrid';
 
 export interface DatasetListItem {
   id: string;
@@ -41,6 +41,37 @@ export function DashboardClient({
   selectedDataset,
   userEmail,
 }: DashboardClientProps) {
+  const router = useRouter();
+
+  const handleDeleteDatasetSuccess = () => {
+    router.push('/dashboard');
+    router.refresh();
+  };
+
+  const loadTablePreferences = async (datasetId: string) => {
+    const res = await fetch(`/api/table-preferences?datasetId=${encodeURIComponent(datasetId)}`);
+    if (!res.ok) return { columnOrder: [], columnSizing: {}, columnVisibility: {} };
+    return res.json();
+  };
+
+  const saveTablePreferences = async (
+    datasetId: string,
+    prefs: { columnOrder?: string[]; columnSizing?: Record<string, number>; columnVisibility?: Record<string, boolean> }
+  ) => {
+    await fetch('/api/table-preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datasetId, ...prefs }),
+    });
+  };
+
+  const filterOptions = selectedDataset
+    ? {
+        companies: selectedDataset.aggregateCompany.map((a) => a.company),
+        missionStatuses: selectedDataset.aggregateStatus.map((a) => a.status),
+      }
+    : { companies: [] as string[], missionStatuses: [] as string[] };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <header className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 flex items-center justify-between">
@@ -71,11 +102,12 @@ export function DashboardClient({
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex flex-col gap-3 overflow-hidden">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-slate-900 dark:text-white">Datasets</h2>
-              <UploadDialog onUploadSuccess={() => window.location.reload()} />
+              <UploadDialog onUploadSuccess={() => router.refresh()} />
             </div>
             <DatasetList
               datasets={datasetList}
               selectedId={selectedDataset?.id ?? null}
+              onDeleteSuccess={handleDeleteDatasetSuccess}
             />
           </div>
         </aside>
@@ -89,7 +121,12 @@ export function DashboardClient({
             <>
               <SummaryCards dataset={selectedDataset} />
               <Charts dataset={selectedDataset} />
-              <DataTable datasetId={selectedDataset.id} />
+              <MissionsGrid
+                datasetId={selectedDataset.id}
+                filterOptions={filterOptions}
+                onLoadPreferences={loadTablePreferences}
+                onSavePreferences={saveTablePreferences}
+              />
             </>
           )}
         </main>

@@ -258,9 +258,16 @@ All required functions live in **analytics.py** with exact signatures. Do not ch
 
 ## Running Tests
 
+**Python (analytics):**
 ```bash
 pytest tests/test_analytics.py -v
 ```
+
+**Next.js API (ownership and auth):**
+```bash
+npm run test
+```
+Tests cover: `DELETE /api/datasets/[id]` enforces ownership (404 when dataset not owned), and `GET /api/rows` rejects access to another user’s dataset (404). Input validation on API routes uses zod.
 
 ## Visualization Rationale
 
@@ -276,13 +283,30 @@ Highlights geographic distribution of launch sites and major spaceports. Useful 
 **D) Mission status distribution (pie chart)**  
 Provides a quick overview of success vs. failure ratios and the proportion of partial or prelaunch failures in the dataset.
 
+## Missions table (data grid)
+
+The dashboard Missions table is a **server-side paginated data grid** with:
+
+- **Column reorder** — Drag column headers to reorder (persisted per user per dataset).
+- **Column resizing** — Resize columns by dragging the right edge of the header.
+- **Column visibility** — Use the **Columns** dropdown to show/hide columns (persisted).
+- **Sorting** — Click the sort icon in a header for ascending/descending; multi-sort is supported (server-side).
+- **Quick filter** — Search box (debounced 250ms) searches mission name, company, rocket, and location.
+- **Filters** — Company (multi), Mission status (multi), Date range, Rocket status, Location (multi).
+- **Page size** — 10 / 25 / 50 / 100 per page.
+- **Reset table layout** — Restores default column order, sizing, and visibility and clears saved preferences.
+
+**Table preferences** (column order, column widths, visibility) are stored per user per dataset in the `TablePreference` model and loaded when you select a dataset. Apply the migration `20250215100000_add_table_preference` (or run `npx prisma migrate deploy`) so the table works with preferences.
+
+**Dataset deletion** — Each dataset has a kebab menu (⋮) with **Delete dataset**. Deletion is scoped to the owning user, removes all related rows and aggregates in a transaction, and asks for confirmation. After delete, the list refreshes and selection is cleared.
+
 ## Repository Structure
 
 **Web app (Next.js)**  
-- `src/app/` — App Router pages: `login`, `dashboard`, `api/auth`, `api/upload`, `api/datasets`, `api/rows`
-- `src/components/` — LoginButton, DatasetList, UploadDialog, SummaryCards, Charts, DataTable, Providers
-- `src/lib/` — `auth.ts` (NextAuth), `prisma.ts`, `csv.ts` (parse/validate)
-- `prisma/schema.prisma` — User, Account, Session, Dataset, MissionRow, aggregates
+- `src/app/` — App Router pages: `login`, `dashboard`, `api/auth`, `api/upload`, `api/datasets`, `api/datasets/[id]` (GET + DELETE), `api/rows`, `api/table-preferences`
+- `src/components/` — LoginButton, DatasetList, UploadDialog, SummaryCards, Charts, **MissionsGrid**, MissionsGridSortable, Providers
+- `src/lib/` — `auth.ts` (NextAuth), `prisma.ts`, `csv.ts`, `validate.ts` (zod), `query.ts` (Prisma sort/filter helpers)
+- `prisma/schema.prisma` — User, Account, Session, Dataset, MissionRow, aggregates, **TablePreference**
 - `package.json`, `next.config.js`, `tailwind.config.ts`
 
 **Streamlit / Python**  

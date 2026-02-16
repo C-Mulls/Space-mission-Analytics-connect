@@ -59,3 +59,35 @@ export async function GET(
       dataset.aggregateRocket[0]?.rocket ?? '',
   });
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const dataset = await prisma.dataset.findFirst({
+    where: { id, userId: session.user.id },
+    select: { id: true },
+  });
+  if (!dataset) {
+    return NextResponse.json({ error: 'Dataset not found' }, { status: 404 });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.aggregateCompany.deleteMany({ where: { datasetId: id } });
+    await tx.aggregateYear.deleteMany({ where: { datasetId: id } });
+    await tx.aggregateStatus.deleteMany({ where: { datasetId: id } });
+    await tx.aggregateRocket.deleteMany({ where: { datasetId: id } });
+    await tx.missionRow.deleteMany({ where: { datasetId: id } });
+    await tx.tablePreference.deleteMany({ where: { datasetId: id } });
+    await tx.dataset.delete({ where: { id } });
+  });
+
+  return NextResponse.json({ ok: true });
+}
