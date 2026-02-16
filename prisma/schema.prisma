@@ -1,0 +1,144 @@
+// Prisma schema for Space Missions Dashboard
+// Run: npx prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  datasets      Dataset[]
+}
+
+model Account {
+  userId            String
+  id                String  @id @default(cuid())
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Dataset {
+  id               String   @id @default(cuid())
+  userId           String
+  name             String
+  originalFileName String
+  uploadedAt       DateTime @default(now())
+  rowCount         Int      @default(0)
+  dateMin         DateTime?
+  dateMax         DateTime?
+  droppedRowCount  Int      @default(0)
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missionRows       MissionRow[]
+  aggregateCompany  AggregateCompany[]
+  aggregateYear     AggregateYear[]
+  aggregateStatus   AggregateStatus[]
+  aggregateRocket   AggregateRocket[]
+
+  @@index([userId, uploadedAt])
+}
+
+model MissionRow {
+  id           String   @id @default(cuid())
+  datasetId    String
+  company      String
+  location     String
+  date         DateTime
+  time         String
+  rocket       String
+  mission      String
+  rocketStatus String
+  price        Decimal? @db.Decimal(14, 2)
+  missionStatus String
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId, date])
+}
+
+model AggregateCompany {
+  id          String @id @default(cuid())
+  datasetId   String
+  company     String
+  missionCount Int
+  successCount Int
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId, missionCount])
+}
+
+model AggregateYear {
+  id           String @id @default(cuid())
+  datasetId    String
+  year         Int
+  missionCount Int
+  successCount Int    @default(0)
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+}
+
+model AggregateStatus {
+  id          String @id @default(cuid())
+  datasetId   String
+  status      String
+  missionCount Int
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+}
+
+model AggregateRocket {
+  id          String @id @default(cuid())
+  datasetId   String
+  rocket      String
+  missionCount Int
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+}

@@ -1,0 +1,18 @@
+# Local Postgres for NextAuth + app data. Start with: docker compose up -d
+# Then use DATABASE_URL below in .env.local and run: npx prisma migrate dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: spacemission
+      POSTGRES_PASSWORD: spacemission
+      POSTGRES_DB: spacemission
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

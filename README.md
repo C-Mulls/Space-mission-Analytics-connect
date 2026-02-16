@@ -1,0 +1,224 @@
+# Space Missions Dashboard
+
+An interactive dashboard that works with user-uploaded CSV files. This repo includes:
+
+- **Web app (Next.js)** — Production-ready app with Google login, per-user datasets, and deployment on Vercel (see below).
+- **Streamlit app (Python)** — Classic dashboard; run with `streamlit run app.py`.
+
+---
+
+## Web App (Next.js) — Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL (local via Docker, or a hosted DB such as [Neon](https://neon.tech) or [Vercel Postgres](https://vercel.com/storage/postgres))
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Environment variables (required for login)
+
+Create **`.env`** at the project root (same folder as `package.json`). Use `.env` so both **Next.js** and the **Prisma CLI** see your vars (Prisma only loads `.env`, not `.env.local`):
+
+```bash
+cp .env.example .env
+```
+
+Edit **`.env`** (no quotes around values, no spaces around `=`):
+
+| Variable | Example / how to get |
+|----------|----------------------|
+| **DATABASE_URL** | See step 3 (Docker) or use Neon/Vercel Postgres URL |
+| **NEXTAUTH_URL** | `http://localhost:3000` |
+| **NEXTAUTH_SECRET** | `openssl rand -base64 32` |
+| **GOOGLE_CLIENT_ID** | From Google Cloud Console → Credentials → OAuth 2.0 Client (Web) |
+| **GOOGLE_CLIENT_SECRET** | Same OAuth client |
+
+All of these are required so NextAuth can persist sessions (without `DATABASE_URL` you get a redirect loop after Google login).
+
+### 3. Database
+
+You need a Postgres database and a `DATABASE_URL`. Two options:
+
+**Option A — Free hosted Postgres (no Docker or local install)**
+
+1. Go to [Neon](https://neon.tech) and sign up (free).
+2. Create a new project and copy the **connection string** (looks like `postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`).
+3. Put it in **`.env`** and **`.env.local`** as:
+   ```env
+   DATABASE_URL=postgresql://...your-neon-connection-string...
+   ```
+4. Then run step 4 (migrate) below.
+
+**Option B — Local Postgres with Docker**
+
+If you have Docker installed:
+
+```bash
+docker compose up -d
+```
+
+Check it’s running: `docker compose ps` (postgres should be “Up”). Then set in **`.env`** and **`.env.local`**:
+
+```env
+DATABASE_URL=postgresql://spacemission:spacemission@localhost:5432/spacemission?schema=public
+```
+
+**If you don’t have Docker:** use Option A (Neon) above. If you get “Authentication failed” (P1000), the Postgres at localhost isn’t using user `spacemission` — use Option A or start this project’s Postgres with `docker compose up -d`.
+
+### 4. Generate Prisma client and run migrations
+
+```bash
+npx prisma generate
+npm run prisma:migrate -- --name init
+```
+
+The script loads both `.env` and `.env.local`, so `DATABASE_URL` in `.env.local` is used. For a one-off without the script: `npx prisma migrate dev --name init` (requires `DATABASE_URL` in `.env`).
+
+This creates the database schema (User, Account, Session, Dataset, etc.). Run migrations once per DB.
+
+**If you get “Environment variable not found: DATABASE_URL”:** Use the npm script so Prisma loads `.env.local` too: run **`npm run prisma:migrate`** (it uses dotenv to load both `.env` and `.env.local`). Or put `DATABASE_URL` in `.env`, or run with the URL inline: `DATABASE_URL=postgresql://spacemission:spacemission@localhost:5432/spacemission?schema=public npx prisma migrate dev --name init`
+
+### 5. Run the app
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). Sign in with Google, then upload a CSV from the dashboard.
+
+**Important:** After changing any env vars, restart the dev server (Ctrl+C, then `npm run dev` again).
+
+### 6. Verification (after login)
+
+- **`.env`** exists and **DATABASE_URL** is set.
+- Dev server was restarted after editing env.
+- After signing in with Google, you are redirected to **/dashboard** (not back to /login).
+- Visit [http://localhost:3000/api/auth/session](http://localhost:3000/api/auth/session): when logged in, the response includes your `user` object.
+- In the database, tables **User**, **Account**, **Session** exist (e.g. `psql $DATABASE_URL -c "\dt"` or use a DB GUI).
+
+---
+
+## Web App — Deploy to Vercel (step-by-step)
+
+### 1. Create a PostgreSQL database
+
+- **Option A — Vercel Postgres:** In the [Vercel Dashboard](https://vercel.com/dashboard), go to **Storage** → **Create Database** → **Postgres**. Create the DB and note the **DATABASE_URL** (and optionally **POSTGRES_URL_NON_POOLING** for migrations).
+- **Option B — Neon:** At [neon.tech](https://neon.tech), create a project and copy the connection string.
+
+### 2. Create Google OAuth credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**.
+2. **Create Credentials** → **OAuth client ID**.
+3. Application type: **Web application**.
+4. **Authorized JavaScript origins:**
+   - Local: `http://localhost:3000`
+   - Production: `https://YOUR_VERCEL_DOMAIN.vercel.app` (and your custom domain if you add one).
+5. **Authorized redirect URIs:**
+   - Local: `http://localhost:3000/api/auth/callback/google`
+   - Production: `https://YOUR_VERCEL_DOMAIN.vercel.app/api/auth/callback/google` (and custom domain callback if needed).
+6. Create the client and copy **Client ID** and **Client secret**.
+
+### 3. Push code and import project on Vercel
+
+1. Push your repo to GitHub/GitLab/Bitbucket.
+2. Go to [vercel.com](https://vercel.com) → **Add New** → **Project**.
+3. Import the repository and confirm the framework is **Next.js** (auto-detected).
+4. **Environment variables** (add these before deploying):
+
+   | Name                | Value                    |
+   |---------------------|--------------------------|
+   | `NEXTAUTH_URL`      | `https://YOUR_DOMAIN.vercel.app` (replace with your actual Vercel URL; update after first deploy if needed) |
+   | `NEXTAUTH_SECRET`   | Output of `openssl rand -base64 32` |
+   | `GOOGLE_CLIENT_ID`  | From Google OAuth client |
+   | `GOOGLE_CLIENT_SECRET` | From Google OAuth client |
+   | `DATABASE_URL`      | Postgres connection string from Vercel Postgres or Neon |
+
+5. **Build command:** leave default or set to `prisma generate && next build` (Vercel runs `prisma generate` automatically if it’s in `postinstall`; we have it in `package.json` scripts).
+6. Click **Deploy**.
+
+### 4. After first deploy
+
+1. In Vercel, open your project → **Settings** → **Domains** and note the production URL (e.g. `your-project.vercel.app`).
+2. Set **NEXTAUTH_URL** to that URL (e.g. `https://your-project.vercel.app`) if you didn’t already.
+3. In Google Cloud Console, add the production origin and redirect URI for that URL (see step 2 above).
+4. Run migrations against the production DB (from your machine or a one-off script):
+
+   ```bash
+   DATABASE_URL="your-production-database-url" npx prisma migrate deploy
+   ```
+
+   For Vercel Postgres, use the **direct** (non-pooling) URL for migrations if recommended by Vercel.
+
+### 5. Redeploy
+
+Trigger a new deployment (e.g. **Redeploy** in Vercel) so the updated **NEXTAUTH_URL** and Google redirect URIs are in effect. Then open `https://your-project.vercel.app`, sign in with Google, and upload a CSV to confirm end-to-end.
+
+---
+
+## Streamlit App — Setup and Run
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+On first load, upload a CSV with the required columns. No sample data is loaded by default.
+
+**Required CSV columns:** `Company`, `Location`, `Date`, `Time`, `Rocket`, `Mission`, `RocketStatus`, `Price`, `MissionStatus`  
+**Date format:** `YYYY-MM-DD` (rows with invalid dates are dropped)
+
+## Programmatically Graded Functions
+
+All required functions live in **analytics.py** with exact signatures. Do not change names, casing, or signatures. They are:
+
+- `getMissionCountByCompany(companyName: str) -> int`
+- `getSuccessRate(companyName: str) -> float`
+- `getMissionsByDateRange(startDate: str, endDate: str) -> list`
+- `getTopCompaniesByMissionCount(n: int) -> list`
+- `getMissionStatusCount() -> dict`
+- `getMissionsByYear(year: int) -> int`
+- `getMostUsedRocket() -> str`
+- `getAverageMissionsPerYear(startYear: int, endYear: int) -> float`
+
+## Running Tests
+
+```bash
+pytest tests/test_analytics.py -v
+```
+
+## Visualization Rationale
+
+**A) Success rate over time by year (line chart)**  
+Shows the trend and inflection points of mission success across decades. Helps identify periods of technological maturity vs. higher-risk exploration phases.
+
+**B) Missions by company (bar chart)**  
+Compares operator activity concentration. Highlights which agencies or companies have dominated launch cadence and where market share has shifted.
+
+**C) Launches by location (bar chart)**  
+Highlights geographic distribution of launch sites and major spaceports. Useful for understanding infrastructure concentration and regional space activity.
+
+**D) Mission status distribution (pie chart)**  
+Provides a quick overview of success vs. failure ratios and the proportion of partial or prelaunch failures in the dataset.
+
+## Repository Structure
+
+**Web app (Next.js)**  
+- `src/app/` — App Router pages: `login`, `dashboard`, `api/auth`, `api/upload`, `api/datasets`, `api/rows`
+- `src/components/` — LoginButton, DatasetList, UploadDialog, SummaryCards, Charts, DataTable, Providers
+- `src/lib/` — `auth.ts` (NextAuth), `prisma.ts`, `csv.ts` (parse/validate)
+- `prisma/schema.prisma` — User, Account, Session, Dataset, MissionRow, aggregates
+- `package.json`, `next.config.js`, `tailwind.config.ts`
+
+**Streamlit / Python**  
+- `analytics.py` — Required functions (use `space_missions.csv` for tests), optional `set_active_df`/`get_active_df`
+- `app.py` — Streamlit dashboard with CSV upload workflow
+- `data_store.py` — Session state management for uploaded data
+- `space_missions.csv` — Sample data (used by pytest for graded functions)
+- `requirements.txt` — Dependencies
+- `assets/logo.svg` — Dashboard logo
+- `tests/test_analytics.py` — Pytest tests for analytics functions
