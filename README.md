@@ -11,6 +11,8 @@ An interactive dashboard that works with user-uploaded CSV files. This repo incl
 
 Follow these steps so Google login works on Vercel (avoids “DATABASE_URL missing” after the OAuth callback).
 
+**Quick fix if you see “DATABASE_URL is not set” after Google login:** Create a free DB at [Neon](https://neon.tech), copy the connection string, then in Vercel go to Project → Settings → Environment Variables, add **DATABASE_URL** with that URL (Production), save, and Redeploy. Run `npx prisma migrate deploy` locally with that same URL once.
+
 1. **Create a Postgres database**
    - **Vercel Postgres:** In the [Vercel Dashboard](https://vercel.com/dashboard), go to **Storage** → **Create Database** → **Postgres**. Create the DB; Vercel will add env vars such as `POSTGRES_URL` or `POSTGRES_PRISMA_URL`. The app also reads **DATABASE_URL**, so copy the connection string into an env var named **DATABASE_URL** (or rely on the app’s fallback: it uses `DATABASE_URL` → `POSTGRES_PRISMA_URL` → `POSTGRES_URL`).
    - **Neon:** At [neon.tech](https://neon.tech), create a project and copy the connection string.

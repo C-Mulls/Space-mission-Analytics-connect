@@ -1,13 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 
 /**
- * Resolve database URL from common provider env vars.
+ * Resolve database URL from common provider env vars (Vercel Postgres, Neon, etc.).
  * Prisma schema uses env("DATABASE_URL"), so we set it if we resolved from another name.
  */
 const dbUrl =
   process.env.DATABASE_URL?.trim() ||
   process.env.POSTGRES_PRISMA_URL?.trim() ||
   process.env.POSTGRES_URL?.trim() ||
+  process.env.POSTGRES_URL_NON_POOLING?.trim() ||
+  process.env.NEON_DATABASE_URL?.trim() ||
   '';
 
 if (dbUrl && !process.env.DATABASE_URL) {

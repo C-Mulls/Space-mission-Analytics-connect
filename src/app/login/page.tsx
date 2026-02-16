@@ -20,9 +20,10 @@ export default async function LoginPage({
 
   const callbackErrorMessage = isProduction ? (
     <p className="mt-1 text-red-700 dark:text-red-300">
-      <strong>DATABASE_URL</strong> is not set in Vercel Project Settings. Add a hosted Postgres
-      connection string (Vercel Postgres or Neon) under Settings → Environment Variables, then
-      redeploy. See the README &quot;Vercel Setup&quot; section for exact steps.
+      Add a Postgres connection string in Vercel: open your project → <strong>Settings</strong> →{' '}
+      <strong>Environment Variables</strong> → add <strong>DATABASE_URL</strong> with the URL from{' '}
+      <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="underline">Neon</a>
+      {' '}or your Vercel Storage Postgres. Apply to <strong>Production</strong>, save, then <strong>Redeploy</strong> the project.
     </p>
   ) : (
     <p className="mt-1 text-red-700 dark:text-red-300">
