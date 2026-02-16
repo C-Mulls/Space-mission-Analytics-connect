@@ -45,6 +45,26 @@ Follow these steps so Google login works on Vercel (avoids “DATABASE_URL missi
 
 **Check:** After redeploy, open `https://<your-project>.vercel.app/api/health/db`. It should return `{ "ok": true }` if the database is configured and reachable. Then try signing in with Google.
 
+**If you see “redirected you too many times” (ERR_TOO_MANY_REDIRECTS):** This is usually a stale or invalid session cookie. Fix it: (1) Clear all cookies for your app’s domain (e.g. in Chrome: open your app URL → lock icon → Cookies → remove all for this site), or use a private/incognito window. (2) In Vercel set **NEXTAUTH_URL** exactly to your app URL with no trailing slash (e.g. `https://space-mission-analytics-connect.vercel.app`). (3) Redeploy. Then open the app again and sign in.
+
+**If you see “Error 400: redirect_uri_mismatch” from Google:** The redirect URI your app sends must **exactly** match one of the URIs in Google Cloud Console. Fix it like this:
+1. In **Vercel**, copy your app URL (e.g. `https://space-mission-analytics-connect.vercel.app`). Ensure **NEXTAUTH_URL** in Vercel is set to that exact URL (no trailing slash).
+2. Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials** → click your **OAuth 2.0 Client ID** (type “Web application”).
+3. Under **Authorized redirect URIs**, click **+ ADD URI** and add exactly:
+   ```
+   https://YOUR-VERCEL-URL.vercel.app/api/auth/callback/google
+   ```
+   Example: `https://space-mission-analytics-connect.vercel.app/api/auth/callback/google`  
+   No trailing slash, no typos. If you use a custom domain, add that too (e.g. `https://yourdomain.com/api/auth/callback/google`).
+4. Under **Authorized JavaScript origins**, add:
+   ```
+   https://YOUR-VERCEL-URL.vercel.app
+   ```
+   (and your custom domain if you use one).
+5. Click **Save**. Changes can take a few minutes. Then try signing in again.
+
+**Let anyone with a Google account sign in:** In Google Cloud Console go to **APIs & Services** → **OAuth consent screen**. If **Publishing status** is **Testing**, only test users can sign in. To allow anyone: set **User type** to **External**, then click **Publish app** so the status becomes **In production**. No verification is required for basic sign-in with limited scope.
+
 ---
 
 ## Web App (Next.js) — Local Development

@@ -19,12 +19,20 @@ export default async function LoginPage({
     process.env.VERCEL === '1' || (process.env.NEXTAUTH_URL ?? '').startsWith('https://');
 
   const callbackErrorMessage = isProduction ? (
-    <p className="mt-1 text-red-700 dark:text-red-300">
-      Add a Postgres connection string in Vercel: open your project → <strong>Settings</strong> →{' '}
-      <strong>Environment Variables</strong> → add <strong>DATABASE_URL</strong> with the URL from{' '}
-      <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="underline">Neon</a>
-      {' '}or your Vercel Storage Postgres. Apply to <strong>Production</strong>, save, then <strong>Redeploy</strong> the project.
-    </p>
+    <>
+      <p className="mt-1 text-red-700 dark:text-red-300">
+        If <strong>DATABASE_URL</strong> is not set in Vercel: add it under Settings → Environment Variables (use your Neon connection string), then Redeploy.
+      </p>
+      <p className="mt-2 text-red-700 dark:text-red-300">
+        If <strong>DATABASE_URL is already set</strong>, the database may be missing tables. From your machine run:
+      </p>
+      <code className="mt-1 block text-left text-xs bg-red-100 dark:bg-red-900/40 p-2 rounded break-all">
+        DATABASE_URL=&quot;your-neon-url&quot; npx prisma migrate deploy
+      </code>
+      <p className="mt-2 text-red-700 dark:text-red-300 text-xs">
+        Use the same Neon URL as in Vercel. Then try signing in again.
+      </p>
+    </>
   ) : (
     <p className="mt-1 text-red-700 dark:text-red-300">
       Server is missing database configuration. Set <strong>DATABASE_URL</strong> in{' '}
