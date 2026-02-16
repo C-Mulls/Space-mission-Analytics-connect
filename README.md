@@ -70,18 +70,24 @@ DATABASE_URL=postgresql://spacemission:spacemission@localhost:5432/spacemission?
 
 **If you don’t have Docker:** use Option A (Neon) above. If you get “Authentication failed” (P1000), the Postgres at localhost isn’t using user `spacemission` — use Option A or start this project’s Postgres with `docker compose up -d`.
 
-### 4. Generate Prisma client and run migrations
+### 4. Generate Prisma client and run migrations (local only)
 
 ```bash
 npx prisma generate
 npm run prisma:migrate -- --name init
 ```
 
-The script loads both `.env` and `.env.local`, so `DATABASE_URL` in `.env.local` is used. For a one-off without the script: `npx prisma migrate dev --name init` (requires `DATABASE_URL` in `.env`).
+The script loads both `.env` and `.env.local`, so `DATABASE_URL` in `.env.local` is used. This creates the database schema (User, Account, Session, Dataset, etc.) locally.
 
-This creates the database schema (User, Account, Session, Dataset, etc.). Run migrations once per DB.
+**Production (Vercel):** Do **not** run `prisma migrate dev` on Vercel. The build only runs `prisma generate` (via `postinstall` and the `build` script). Run migrations against your production database from your machine or a CI step:
 
-**If you get “Environment variable not found: DATABASE_URL”:** Use the npm script so Prisma loads `.env.local` too: run **`npm run prisma:migrate`** (it uses dotenv to load both `.env` and `.env.local`). Or put `DATABASE_URL` in `.env`, or run with the URL inline: `DATABASE_URL=postgresql://spacemission:spacemission@localhost:5432/spacemission?schema=public npx prisma migrate dev --name init`
+```bash
+DATABASE_URL="your-production-database-url" npx prisma migrate deploy
+```
+
+For Vercel Postgres, use the **direct** (non-pooling) connection URL for `migrate deploy` if recommended by Vercel. No seed or migrate step is required for the Vercel build to succeed.
+
+**If you get “Environment variable not found: DATABASE_URL”:** Use **`npm run prisma:migrate`** so the script can copy from `.env.local` into `.env`, or put `DATABASE_URL` in `.env`.
 
 ### 5. Run the app
 
@@ -128,35 +134,40 @@ Open [http://localhost:3000](http://localhost:3000). Sign in with Google, then u
 1. Push your repo to GitHub/GitLab/Bitbucket.
 2. Go to [vercel.com](https://vercel.com) → **Add New** → **Project**.
 3. Import the repository and confirm the framework is **Next.js** (auto-detected).
-4. **Environment variables** (add these before deploying):
+4. **Environment variables** — In the project, go to **Settings** → **Environment Variables** and add (for Production, Preview, Development as needed):
 
-   | Name                | Value                    |
-   |---------------------|--------------------------|
-   | `NEXTAUTH_URL`      | `https://YOUR_DOMAIN.vercel.app` (replace with your actual Vercel URL; update after first deploy if needed) |
-   | `NEXTAUTH_SECRET`   | Output of `openssl rand -base64 32` |
-   | `GOOGLE_CLIENT_ID`  | From Google OAuth client |
-   | `GOOGLE_CLIENT_SECRET` | From Google OAuth client |
-   | `DATABASE_URL`      | Postgres connection string from Vercel Postgres or Neon |
+   | Name                  | Value |
+   |-----------------------|--------|
+   | `DATABASE_URL`        | Postgres connection string from Vercel Postgres or Neon (required for auth and data). |
+   | `NEXTAUTH_URL`        | `https://<your-project>.vercel.app` or `https://${VERCEL_URL}` (must match the deployed URL). |
+   | `NEXTAUTH_SECRET`     | `openssl rand -base64 32` (random string). |
+   | `GOOGLE_CLIENT_ID`    | From Google OAuth Web client. |
+   | `GOOGLE_CLIENT_SECRET`| From Google OAuth Web client. |
 
-5. **Build command:** leave default or set to `prisma generate && next build` (Vercel runs `prisma generate` automatically if it’s in `postinstall`; we have it in `package.json` scripts).
-6. Click **Deploy**.
+   The build does **not** use local-only env files; all of these must be set in Vercel. If **DATABASE_URL** is missing in production, auth routes return a friendly 503 (app does not crash).
 
-### 4. After first deploy
+5. **Build command:** leave default (`next build`) or use `prisma generate && next build`. `postinstall` already runs `prisma generate`.
+6. Do **not** run `prisma migrate dev` in the build. Run migrations separately (see below).
+7. Click **Deploy**.
 
-1. In Vercel, open your project → **Settings** → **Domains** and note the production URL (e.g. `your-project.vercel.app`).
-2. Set **NEXTAUTH_URL** to that URL (e.g. `https://your-project.vercel.app`) if you didn’t already.
-3. In Google Cloud Console, add the production origin and redirect URI for that URL (see step 2 above).
-4. Run migrations against the production DB (from your machine or a one-off script):
+### 4. Run production migrations
 
-   ```bash
-   DATABASE_URL="your-production-database-url" npx prisma migrate deploy
-   ```
+After the first deploy, apply the schema to your production database (from your machine or CI):
 
-   For Vercel Postgres, use the **direct** (non-pooling) URL for migrations if recommended by Vercel.
+```bash
+DATABASE_URL="your-production-database-url" npx prisma migrate deploy
+```
 
-### 5. Redeploy
+If using **Vercel Postgres**, use the **direct** (non-pooling) URL for `migrate deploy` when recommended by Vercel.
 
-Trigger a new deployment (e.g. **Redeploy** in Vercel) so the updated **NEXTAUTH_URL** and Google redirect URIs are in effect. Then open `https://your-project.vercel.app`, sign in with Google, and upload a CSV to confirm end-to-end.
+### 5. Vercel verification checklist
+
+- [ ] **Env vars in Vercel:** Settings → Environment Variables — `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` are set.
+- [ ] **DATABASE_URL:** Points to your Vercel Postgres (or Neon) instance; run `npx prisma migrate deploy` with that URL so tables exist.
+- [ ] **NEXTAUTH_URL:** Set to `https://<your-project>.vercel.app` (or your custom domain). You can use `https://${VERCEL_URL}` if you rely on Vercel’s automatic URL.
+- [ ] **Google OAuth:** In Google Cloud Console, add the production redirect URI: `https://<your-project>.vercel.app/api/auth/callback/google` (and origin `https://<your-project>.vercel.app`).
+- [ ] **Redeploy** after changing any env var so the new values are used.
+- [ ] Visit `https://<your-project>.vercel.app`, sign in with Google, and confirm you reach the dashboard.
 
 ---
 

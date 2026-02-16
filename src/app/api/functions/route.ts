@@ -100,7 +100,7 @@ export async function GET(request: Request) {
       const start = new Date(startDate);
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      if (isNaN(start.getTime()) || isNaN(end.getTime()) {
+      if ((isNaN(start.getTime()) || isNaN(end.getTime()))) {
         return NextResponse.json({ result: [] });
       }
       const rows = await prisma.missionRow.findMany({

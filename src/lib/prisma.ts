@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 
-if (!process.env.DATABASE_URL?.trim()) {
+export const isDatabaseConfigured = Boolean(process.env.DATABASE_URL?.trim());
+
+if (!isDatabaseConfigured) {
   console.error(
-    '[Prisma] DATABASE_URL is not set. NextAuth cannot persist sessions and login will redirect to /login with error=Callback. ' +
-      'Set DATABASE_URL in .env.local. For local Postgres via Docker: docker compose up -d then DATABASE_URL=postgresql://spacemission:spacemission@localhost:5432/spacemission?schema=public'
+    '[Prisma] DATABASE_URL is not set. Auth and data features will be disabled. ' +
+      'Set DATABASE_URL in Vercel project settings or in .env.local for local dev.'
   );
 }
 
